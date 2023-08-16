@@ -13,7 +13,6 @@ export const generateMocks = () => {
     headers: {
       cookie: "",
     },
-    cookies: {},
     signedCookies: {},
     secret: COOKIE_SECRET,
   } as unknown as Request;
@@ -36,9 +35,7 @@ export const generateMocks = () => {
     value: string,
     options?: CookieOptions
   ) => {
-    const parsesValue = options?.signed
-      ? "s:" + sign(value, COOKIE_SECRET)
-      : value;
+    const parsesValue = "s:" + sign(value, COOKIE_SECRET);
     const data: string = serializeCookie(name, parsesValue, options);
     const previous = mockResponse.getHeader("set-cookie") || [];
     const header = Array.isArray(previous)
@@ -66,7 +63,6 @@ export const cookieParserMiddleware = cookieParser(COOKIE_SECRET);
 
 export type GenerateMocksWithTokenOptions = {
   cookieName: string;
-  signed: boolean;
   generateToken: CsrfTokenCreator;
   validateRequest: CsrfRequestValidator;
 };
@@ -75,7 +71,6 @@ export type GenerateMocksWithTokenOptions = {
 // Set them up as if they have been pre-processed in a valid state.
 export const generateMocksWithToken = ({
   cookieName,
-  signed,
   generateToken,
   validateRequest,
 }: GenerateMocksWithTokenOptions) => {
@@ -84,18 +79,14 @@ export const generateMocksWithToken = ({
   const csrfToken = generateToken(mockResponse, mockRequest);
   const { setCookie, cookieValue } = getCookieValueFromResponse(mockResponse);
   mockRequest.headers.cookie = `${cookieName}=${cookieValue};`;
-  const decodedCookieValue = signed
-    ? signedCookie(
-        parse(mockRequest.headers.cookie)[cookieName],
-        mockRequest.secret as string
-      )
-    : // signedCookie already decodes the value, but we need it if it's not signed.
-      decodeURIComponent(cookieValue);
-  // Have to delete the cookies object otherwise cookieParser will skip it's parsing.
-  delete mockRequest["cookies"];
+  const decodedCookieValue = signedCookie(
+    parse(mockRequest.headers.cookie)[cookieName],
+    mockRequest.secret as string
+  );
+
   cookieParserMiddleware(mockRequest, mockResponse, next);
   assert.equal(
-    getCookieFromRequest(cookieName, signed, mockRequest),
+    getCookieFromRequest(cookieName, mockRequest),
     decodedCookieValue
   );
 

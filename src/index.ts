@@ -7,7 +7,10 @@ import type { HttpError } from "http-errors";
 
 export type SameSiteType = boolean | "lax" | "strict" | "none";
 export type TokenRetriever = (req: Request) => string | null | undefined;
-export type DoubleCsrfCookieOptions = Omit<CookieOptions, "httpOnly">;
+export type DoubleCsrfCookieOptions = Omit<
+  CookieOptions,
+  "httpOnly" | "signed"
+>;
 declare module "http" {
   interface IncomingHttpHeaders {
     "x-csrf-token"?: string | undefined;
@@ -137,13 +140,16 @@ export function doubleCsrf({
   ) => {
     const { csrfToken, csrfTokenHash } = generateTokenAndHash(req, overwrite);
     const cookieContent = `${csrfToken}|${csrfTokenHash}`;
-    res.cookie(cookieName, cookieContent, { ...cookieOptions, httpOnly: true });
+    res.cookie(cookieName, cookieContent, {
+      ...cookieOptions,
+      httpOnly: true,
+      signed: true,
+    });
     return csrfToken;
   };
 
-  const getCsrfCookieFromRequest = remainingCOokieOptions.signed
-    ? (req: Request) => req.signedCookies[cookieName] as string
-    : (req: Request) => req.cookies[cookieName] as string;
+  const getCsrfCookieFromRequest = (req: Request) =>
+    req.signedCookies[cookieName] as string;
 
   // validates if a token and its hash matches, given the secret that was originally included in the hash
   const validateTokenAndHashPair: CsrfTokenAndHashPairValidator = (

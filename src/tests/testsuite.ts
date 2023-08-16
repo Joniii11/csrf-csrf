@@ -35,18 +35,12 @@ export const createTestSuite: CreateTestsuite = (name, doubleCsrfOptions) => {
 
     const {
       cookieName = "__Host-psifi.x-csrf-token",
-      cookieOptions: {
-        signed = false,
-        path = "/",
-        secure = true,
-        sameSite = "lax",
-      } = {},
+      cookieOptions: { path = "/", secure = true, sameSite = "lax" } = {},
     } = doubleCsrfOptions;
 
     const generateMocksWithTokenIntenral = () =>
       generateMocksWithToken({
         cookieName,
-        signed,
         generateToken,
         validateRequest,
       });
@@ -55,16 +49,14 @@ export const createTestSuite: CreateTestsuite = (name, doubleCsrfOptions) => {
       it("should attach both a token and its hash to the response and return a token", () => {
         const { mockRequest, decodedCookieValue, setCookie } =
           generateMocksWithTokenIntenral();
-        const cookieValue = signed
-          ? `s:${sign(
-              decodedCookieValue as string,
-              mockRequest.secret as string
-            )}`
-          : decodedCookieValue;
+        const cookieValue = `s:${sign(
+          decodedCookieValue as string,
+          mockRequest.secret as string
+        )}`;
 
         const expectedSetCookieValue = serializeCookie(
           cookieName,
-          cookieValue as string,
+          cookieValue,
           {
             path,
             httpOnly: true,
@@ -116,25 +108,20 @@ export const createTestSuite: CreateTestsuite = (name, doubleCsrfOptions) => {
         const { mockRequest, mockResponse, decodedCookieValue } =
           generateMocksWithTokenIntenral();
         // modify the cookie to make the token/hash pair invalid
-        signed
-          ? (mockRequest.signedCookies[cookieName] = `s:${sign(
-              (decodedCookieValue as string).split("|")[0] + "|invalid-hash",
-              mockRequest.secret as string
-            )}`)
-          : (mockRequest.cookies[cookieName] =
-              (decodedCookieValue as string).split("|")[0] + "|invalid-hash");
+        mockRequest.signedCookies[cookieName] = `s:${sign(
+          (decodedCookieValue as string).split("|")[0] + "|invalid-hash",
+          mockRequest.secret as string
+        )}`;
 
         expect(() => generateToken(mockResponse, mockRequest, false)).to.throw(
           invalidCsrfTokenError.message
         );
 
         // just an invalid value in the cookie
-        signed
-          ? (mockRequest.signedCookies[cookieName] = `s:${sign(
-              "invalid-value",
-              mockRequest.secret as string
-            )}`)
-          : (mockRequest.cookies[cookieName] = "invalid-value");
+        mockRequest.signedCookies[cookieName] = `s:${sign(
+          "invalid-value",
+          mockRequest.secret as string
+        )}`;
 
         expect(() => generateToken(mockResponse, mockRequest, false)).to.throw(
           invalidCsrfTokenError.message
@@ -152,7 +139,7 @@ export const createTestSuite: CreateTestsuite = (name, doubleCsrfOptions) => {
         const { mockRequest, decodedCookieValue } =
           generateMocksWithTokenIntenral();
         assert.equal(
-          getCookieFromRequest(cookieName, signed, mockRequest),
+          getCookieFromRequest(cookieName, mockRequest),
           decodedCookieValue
         );
 
@@ -170,9 +157,7 @@ export const createTestSuite: CreateTestsuite = (name, doubleCsrfOptions) => {
       it("should return false when cookie is not present", () => {
         const { mockRequest } = generateMocksWithTokenIntenral();
         // Wipe hash
-        signed
-          ? delete mockRequest.signedCookies[cookieName]
-          : delete mockRequest.cookies[cookieName];
+        delete mockRequest.signedCookies[cookieName];
         assert.isFalse(validateRequest(mockRequest));
       });
     });
@@ -206,7 +191,6 @@ export const createTestSuite: CreateTestsuite = (name, doubleCsrfOptions) => {
         // Show an invalid case
         const { mockResponse: mockResponseWithToken } = generateMocksWithToken({
           cookieName,
-          signed,
           generateToken,
           validateRequest,
         });
@@ -231,9 +215,7 @@ export const createTestSuite: CreateTestsuite = (name, doubleCsrfOptions) => {
 
       it("should not allow a protected request with no cookie", () => {
         const { mockResponse, mockRequest } = generateMocksWithTokenIntenral();
-        signed
-          ? delete mockRequest.signedCookies[cookieName]
-          : delete mockRequest.cookies[cookieName];
+        delete mockRequest.signedCookies[cookieName];
         assertProtectionToThrow(mockRequest, mockResponse);
       });
 
